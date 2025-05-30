@@ -1,12 +1,14 @@
-// place your const, vars, functions or classes here
-const debug = false;  // Set to true to show debugging into
+// For info on interfacing with Gadgetbridge, see https://www.espruino.com/Gadgetbridge
+const AppName = "_aires_gbmusic.app.js";
+const Debug = false;  // Set to true to show debugging into
 const Layout = require("Layout");
 const Storage = require("Storage");
-const mainFont = "Vector:20%";
+const PrimaryFont = "Vector:18";
 
 const Command = {
   next: "next",
-  playpause: "playpause",
+  pause: "pause",
+  play: "play",
   previous: "previous"
 };
 
@@ -15,13 +17,21 @@ const PlaybackState = {
   playing: "playing"
 };
 
+// Global playback state tracker.
+// Follows the syntax {t:"musicstate", state:"play/pause",position,shuffle,repeat}
+
+let appState = {t:"musicstate", state:"pause", position:0, shuffle:0, repeat:0};
+
 /**
  * Send a command via Bluetooth back to Gadgetbridge.
- * @param {"playpause"|"next"|"previous"} command
+ * @param {"play"|"pause"|"next"|"previous"} command
  */
 function sendCommand(command) {
   Bluetooth.println(JSON.stringify({t: "music", n: command}));
-  draw("title");
+
+  // If this is a play or pause command, update the app state
+  if (command === Command.play) appState = PlaybackState.playing;
+  if (command === Command.pause) appState = PlaybackState.paused;
 }
 
 /**
@@ -37,31 +47,23 @@ function detectEmulator() {
 
 var layout = new Layout({
   type: "v", c: [
-    {type: "txt", id: "title", font:"10%", label: "Unknown Track"},
+    {type: "txt", id: "title", font:PrimaryFont, label: "Unknown Track"},
     {type: "h", c: [
-      {type: "btn", id: Command.previous, label: "|<<", cb: l=>sendCommand(Command.previous)},
-      {type: "btn", id: Command.playpause, label: ">||", cb: l=>sendCommand(Command.playpause)},
-      {type: "btn", id: Command.next, label: ">>|", cb: l=>sendCommand(Command.next)}
+      {type: "btn", id: Command.previous, font: PrimaryFont, label: "|<<", cb: l=>sendCommand(Command.previous)},
+      {type: "btn", id: "playpause", font: PrimaryFont, label: ">||", cb: l=>sendCommand(appState == PlaybackState.paused ? Command.play : Command.pause)},
+      {type: "btn", id: Command.next, font: PrimaryFont, label: ">>|", cb: l=>sendCommand(Command.next)}
     ]},
   ]
 }, {lazy: true});
-
-/**
- * Redraw the screen.
- */
-function draw(element) {
-  layout.update(element);
-  layout.render(element);
-  if (debug) layout.debug();
-}
 
 /**
  * Get info about the current playing song.
  * @param {Object} info - Gadgetbridge musicinfo event
  */
 function showTrackInfo(info) {
-  layout.title.label = info.track || "Unknown Track";
-  draw();
+  layout.title.label = info ? info.track : "Unknown Track";
+  layout.render();
+  if (Debug) layout.debug();
 }
 
 /**
@@ -69,19 +71,26 @@ function showTrackInfo(info) {
  */
 function loadFromStorage() {
   // check for saved music status (by widget) to load
-  let saved = Storage.readJSON("gbmusic.load.json", true);
-  Storage.erase("gbmusic.load.json");
+  let saved = Storage.readJSON(`"${AppName}.load.json`, true);
+  Storage.erase(`${AppName}.load.json`);
   if (saved) {
     showTrackInfo(saved.info);
     return;
   }
 }
 
+/**
+ * Updates the current state of the app.
+ * Called when Gadgetbridge updates (see boot.js)
+ * @param {*} state 
+ */
+function updateState(state) {
+  appState = state;
+}
+
+// Start the app
 detectEmulator();
 loadFromStorage();
 
-// Clear the screen
 g.clear();
-draw();
-
-// TODO: Get updates from Gadgetbridge
+layout.render();
