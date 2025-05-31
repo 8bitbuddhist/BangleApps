@@ -1,9 +1,7 @@
 // For info on interfacing with Gadgetbridge, see https://www.espruino.com/Gadgetbridge
-const AppName = "_aires_gbmusic";
 const Debug = false;  // Set to true to show debugging into
 const Layout = require("Layout");
-const Storage = require("Storage");
-const PrimaryFont = "Vector:18";
+const PrimaryFont = g.getFont() || "Vector:18";
 
 const Command = {
   next: "next",
@@ -49,19 +47,6 @@ function detectEmulator() {
 }
 
 /**
- * Load previously saved music status.
- */
-function loadFromStorage() {
-  // check for saved music status (by widget) to load
-  let saved = Storage.readJSON(`"${AppName}.load.json`, true);
-  Storage.erase(`${AppName}.load.json`);
-  if (saved) {
-    showTrackInfo(saved.info);
-    return;
-  }
-}
-
-/**
  * Send a command via Bluetooth back to Gadgetbridge.
  * @param {"play"|"pause"|"next"|"previous"} command
  */
@@ -96,34 +81,17 @@ function updateState(state) {
 /**
  * Listen for Gadgetbridge events
  */
-setTimeout( // make other boot code run first
+setTimeout(
   () => {
-    let state, info;
- 
     /**
-     * Store track info so the app can grab it later
+     * Read music events from Gadgetbridge.
      */
-    function saveTrackInfo() {
-      require("Storage").writeJSON(`${AppName}.load.json`, {
-        state: state,
-        info: info,
-      });
-    }
-
-    /**
-     * Check to see if we're currently running the app.
-     * If so, send music events to the app.
-     * If not, save music events for later.
-     */
-    const IsAppOpen = globalThis.__FILE__ === `${AppName}.app.js`;
     globalThis.GB = (_GB => e => {
       switch(e.t) {
         case "musicinfo":
-          info = e;
-          return IsAppOpen ? globalThis.showTrackInfo(e) : saveTrackInfo();
+          return showTrackInfo(e);
         case "musicstate":
-          state = e;
-          return IsAppOpen ? globalThis.updateState(e) : saveTrackInfo();
+          return updateState(e);
         default:
           // pass on other events
           if (_GB) setTimeout(_GB, 0, e);
@@ -134,7 +102,6 @@ setTimeout( // make other boot code run first
 
 // Start the app
 detectEmulator();
-loadFromStorage();
 
 g.clear();
 layout.render();
