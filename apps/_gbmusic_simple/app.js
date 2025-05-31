@@ -2,6 +2,7 @@
 const Debug = false;  // Set to true to show debugging into
 const Layout = require("Layout");
 const PrimaryFont = g.getFont() || "Vector:18";
+const TextScroller = require("TextScroller");
 
 const Command = {
   next: "next",
@@ -35,6 +36,9 @@ let layout = new Layout({
   ]
 }, {lazy: true});
 
+/// Scroll the title text.
+let titleScroll = new TextScroller(layout.title, 200);
+
 /**
  * Detect whether we're using an emulator.
  */
@@ -54,8 +58,14 @@ function sendCommand(command) {
   Bluetooth.println(JSON.stringify({t: "music", n: command}));
 
   // If this is a play or pause command, update the app state
-  if (command === Command.play) updateState(PlaybackState.playing);
-  if (command === Command.pause) updateState(PlaybackState.paused);
+  if (command === Command.play) {
+    titleScroll.start();
+    updateState(PlaybackState.playing);
+  }
+  else if (command === Command.pause) {
+    titleScroll.pause();
+    updateState(PlaybackState.paused);
+  };
 }
 
 /**
@@ -66,6 +76,8 @@ function sendCommand(command) {
 function showTrackInfo(info) {
   layout.title.label = info ? info.track : "Unknown Track";
   layout.render();
+  titleScroll.stop();
+  titleScroll.start();
   if (Debug) layout.debug();
 }
 
