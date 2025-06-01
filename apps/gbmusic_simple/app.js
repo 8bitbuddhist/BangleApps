@@ -21,9 +21,6 @@ const PlaybackState = {
  */
 let appState = { t: "musicstate", state: "pause", position: 0, shuffle: 0, repeat: 0 };
 
-/// Track the current song so we can reset the elapsed time when needed
-let currentSong = "Unknown";
-
 /// Track the curent runtime
 let elapsedTimer;
 
@@ -99,7 +96,6 @@ function showTrackInfo(info) {
   layout.artist.label = info ? info.artist : "Unknown Track";
   layout.elapsed.label = "00:00";
   layout.duration.label = info ? formatTime(info.dur) : "00:00";
-  currentSong = info.track;
   layout.render();
   if (Debug) layout.debug();
 }
