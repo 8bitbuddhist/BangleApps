@@ -21,9 +21,6 @@ const PlaybackState = {
  */
 let appState = { t: "musicstate", state: "pause", position: 0, shuffle: 0, repeat: 0 };
 
-/// Track the curent runtime
-let elapsedTimer;
-
 /**
  * Define the screen layout.
  */
@@ -62,6 +59,7 @@ function detectEmulator() {
  * @param {"play"|"pause"|"next"|"previous"} command
  */
 function sendCommand(command) {
+  Bangle.buzz(200, 0.5);
   Bluetooth.println(JSON.stringify({ t: "music", n: command }));
 
   // If this is a play or pause command, update the app state
@@ -74,11 +72,12 @@ function sendCommand(command) {
 }
 
 /// Track how long the current song has been running.
-var songElapsed = 0;
+let elapsedTimer;
+let position = 0;
 function updateTime() {
-  songElapsed++;
-  layout.elapsed.label = formatTime(songElapsed);
-  layout.render(layout.elapsed.label);
+  position++;
+  layout.elapsed.label = formatTime(position);
+  layout.render();
 }
 
 function formatTime(time) {
@@ -107,13 +106,9 @@ function showTrackInfo(info) {
  */
 function updateState(state) {
   appState.state = state;
-
-  if (appState.state === "play" ) {
-    elapsedTimer = setInterval(updateTime, 200);
-  }
-  else if (appState.state === "pause" ) {
-    clearInterval(elapsedTimer);
-  }
+  position = state.position;
+  if (state === PlaybackState.playing) elapsedTimer = setTimeout(updateTime, 1000);
+  else if (state === PlaybackState.paused) clearTimeout(elapsedTimer);
 }
 
 /**
