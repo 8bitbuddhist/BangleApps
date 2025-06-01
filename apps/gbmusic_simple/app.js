@@ -1,7 +1,9 @@
-// For info on interfacing with Gadgetbridge, see https://www.espruino.com/Gadgetbridge
+ // For info on interfacing with Gadgetbridge, see https://www.espruino.com/Gadgetbridge
 const Debug = false;  // Set to true to show debugging into
 const Layout = require("Layout");
-const PrimaryFont = "Vector:18" || g.getFont();
+const PrimaryFont = "Vector:18";
+
+const buttonPadding = 10;
 
 const Command = {
   next: "next",
@@ -11,15 +13,15 @@ const Command = {
 };
 
 const PlaybackState = {
-  paused: "paused",
-  playing: "playing"
+  paused: "pause",
+  playing: "play"
 };
 
 /**
  * Global playback state tracker.
  * Follows the syntax {t:"musicstate", state:"play/pause",position,shuffle,repeat}
  */
-let appState = { t: "musicstate", state: "pause", position: 0, shuffle: 0, repeat: 0 };
+let appState = { t: "musicstate", state: PlaybackState.paused, position: 0, shuffle: 0, repeat: 0 };
 
 /**
  * Define the screen layout.
@@ -35,9 +37,9 @@ let layout = new Layout({
     ]},
     {
       type: "h", c: [
-        { type: "btn", id: Command.previous, font: PrimaryFont, col: g.fg2, bgCol: g.bg2,  label: "|<<", cb: l => sendCommand(Command.previous) },
-        { type: "btn", id: "playpause", font: PrimaryFont, col: g.fg2, bgCol: g.bg2, label: ">||", cb: l => sendCommand(appState.state === PlaybackState.paused ? Command.play : Command.pause) },
-        { type: "btn", id: Command.next, font: PrimaryFont, col: g.fg2, bgCol: g.bg2, label: ">>|", cb: l => sendCommand(Command.next) }
+        { type: "btn", id: Command.previous, font: PrimaryFont, col: g.fg2, bgCol: g.bg2, pad: buttonPadding, label: "|<<", cb: l => sendCommand(Command.previous) },
+        { type: "btn", id: "playpause", font: PrimaryFont, col: g.fg2, bgCol: g.bg2, pad: buttonPadding, label: ">", cb: l => sendCommand(appState.state === PlaybackState.paused ? Command.play : Command.pause) },
+        { type: "btn", id: Command.next, font: PrimaryFont, col: g.fg2, bgCol: g.bg2, pad: buttonPadding, label: ">>|", cb: l => sendCommand(Command.next) }
       ]
     },
   ]
@@ -54,6 +56,11 @@ function detectEmulator() {
   }
 }
 
+function draw() {
+  layout.render();
+  Bangle.drawWidgets();
+}
+
 /**
  * Send a command via Bluetooth back to Gadgetbridge.
  * @param {"play"|"pause"|"next"|"previous"} command
@@ -63,12 +70,18 @@ function sendCommand(command) {
   Bluetooth.println(JSON.stringify({ t: "music", n: command }));
 
   // If this is a play or pause command, update the app state
-  if (command === Command.play) {
-    updateState(PlaybackState.playing);
+  switch (command) {
+    case Command.play:
+      updateState(PlaybackState.playing);
+      break;
+    case Command.pause:
+      updateState(PlaybackState.paused);
+      break;
+    case Command.next:
+    case Command.previous:
+      layout.elapsed.label = "00:00";
+      break;
   }
-  else if (command === Command.pause) {
-    updateState(PlaybackState.paused);
-  };
 }
 
 /// Track how long the current song has been running.
@@ -78,12 +91,22 @@ function updateTime() {
   position++;
   layout.elapsed.label = formatTime(position);
   layout.render();
+
+  if (Debug) console.log("Tick");
 }
 
 function formatTime(time) {
-  let minutes = Math.floor(time / 60);
-  let seconds = time % 60;
-  return `${minutes}:${seconds}`;
+  let minute = 0, second = 0;
+  if (time) {
+    minute = Math.floor(time / 60);
+    second = time % 60;
+  }
+  let minuteStr = minute.toString(), secondStr = second.toString();
+
+  if (minute < 10) minuteStr = `0${minute}`;
+  if (second < 10) secondStr = `0${second}`;
+  
+  return `${minuteStr}:${secondStr}`;
 }
 
 /**
@@ -93,7 +116,6 @@ function formatTime(time) {
 function showTrackInfo(info) {
   layout.title.label = info ? info.track : "Unknown Track";
   layout.artist.label = info ? info.artist : "Unknown Track";
-  layout.elapsed.label = "00:00";
   layout.duration.label = info ? formatTime(info.dur) : "00:00";
   layout.render();
   if (Debug) layout.debug();
@@ -108,13 +130,13 @@ function updateState(state) {
   appState.state = state;
   position = state.position;
   if (state === PlaybackState.playing) {
-    elapsedTimer = setTimeout(updateTime, 1000);
+    elapsedTimer = setInterval(updateTime, 1000);
     layout.playpause.label = "||";
   }
   else if (state === PlaybackState.paused) {
-    clearTimeout(elapsedTimer);
+    if (elapsedTimer) clearInterval(elapsedTimer);
     layout.playpause.label = ">";
-  };
+  }
 }
 
 /**
