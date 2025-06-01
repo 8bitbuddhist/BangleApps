@@ -107,8 +107,14 @@ function showTrackInfo(info) {
 function updateState(state) {
   appState.state = state;
   position = state.position;
-  if (state === PlaybackState.playing) elapsedTimer = setTimeout(updateTime, 1000);
-  else if (state === PlaybackState.paused) clearTimeout(elapsedTimer);
+  if (state === PlaybackState.playing) {
+    elapsedTimer = setTimeout(updateTime, 1000);
+    layout.playpause.label = "||";
+  }
+  else if (state === PlaybackState.paused) {
+    clearTimeout(elapsedTimer);
+    layout.playpause.label = ">";
+  };
 }
 
 /**
